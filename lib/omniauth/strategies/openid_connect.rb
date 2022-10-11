@@ -42,7 +42,7 @@ module OmniAuth
       option :client_x509_signing_key
       option :scope, [:openid]
       option :response_type, 'code' # ['code', 'id_token']
-      option :state
+      option :state, 'default'
       option :response_mode # [:query, :fragment, :form_post, :web_message]
       option :display, nil # [:page, :popup, :touch, :wap]
       option :prompt, nil # [:none, :login, :consent, :select_account]
@@ -64,8 +64,10 @@ module OmniAuth
         #options.uid_field.to_sym || user_info.sub
       end
 
+
       info do
-        #puts "ininfo:#{user_info.name}"
+        puts "org:#{options.state}"
+        if(options.state=='default')
         {
             name: user_info.name,
             email: user_info.email,
@@ -80,6 +82,20 @@ module OmniAuth
             urls: { website: user_info.website },
 
         }
+        else
+                   puts "in other org:#{options.state}"
+                   {
+                       name: user_info.cscn,
+                       email: user_info.csuserprincipalname,
+                       nickname: user_info.cssamaccountname,
+                       first_name: user_info.csgivenname,
+                       last_name: user_info.cssn,
+                       phone: user_info.cstelephonenumber,
+                       provider: options.name,
+                       uid: user_info.sub,
+
+                   }
+        end
       end
 
       extra do
@@ -624,10 +640,17 @@ module OmniAuth
         #puts "id_token_callback_phase"
         # user_data = decode_id_token(params['id_token']).raw_attributes
         #puts "user_data['name']:#{user_info.name}"
+        if(options.state=='default')
+          @name=user_info.name
+          @email=user_info.email
+        else
+          @name=user_info.cscn
+          @email=user_info.csuserprincipalname
+        end
         env['omniauth.auth'] = AuthHash.new(
             provider: name,
             uid: user_info.sub,
-            info: { name: user_info.name, email: user_info.email },
+            info: { name: @name, email: @email },
             extra: { raw_info: user_info }
         )
         #puts " env['omniauth.auth']:#{ env['omniauth.auth']}"

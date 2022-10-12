@@ -66,35 +66,36 @@ module OmniAuth
 
 
       info do
-        puts "org:#{options.state}"
-        if(options.state=='default')
-        {
-            name: user_info.name,
-            email: user_info.email,
-            nickname: user_info.preferred_username,
-            first_name: user_info.given_name,
-            last_name: user_info.family_name,
-            gender: user_info.gender,
-            image: user_info.picture,
-            phone: user_info.phone_number,
-            provider: options.name,
-            uid: user_info.sub,
-            urls: { website: user_info.website },
+        puts "In customized org:#{options.state}"
+        if(options.state.downcase =='wfuat')
+          puts "customized org name:#{options.state}"
+          {
+              name: user_info.cscn,
+              email: user_info.csuserprincipalname,
+              nickname: user_info.cssamaccountname,
+              first_name: user_info.csgivenname,
+              last_name: user_info.cssn,
+              phone: user_info.cstelephonenumber,
+              provider: options.name,
+              uid: user_info.sub,
 
-        }
+          }
         else
-                   puts "in other org:#{options.state}"
-                   {
-                       name: user_info.cscn,
-                       email: user_info.csuserprincipalname,
-                       nickname: user_info.cssamaccountname,
-                       first_name: user_info.csgivenname,
-                       last_name: user_info.cssn,
-                       phone: user_info.cstelephonenumber,
-                       provider: options.name,
-                       uid: user_info.sub,
+          puts "default org name:#{options.state}"
+          {
+              name: user_info.name,
+              email: user_info.email,
+              nickname: user_info.preferred_username,
+              first_name: user_info.given_name,
+              last_name: user_info.family_name,
+              gender: user_info.gender,
+              image: user_info.picture,
+              phone: user_info.phone_number,
+              provider: options.name,
+              uid: user_info.sub,
+              urls: { website: user_info.website },
 
-                   }
+          }
         end
       end
 
@@ -640,12 +641,12 @@ module OmniAuth
         #puts "id_token_callback_phase"
         # user_data = decode_id_token(params['id_token']).raw_attributes
         #puts "user_data['name']:#{user_info.name}"
-        if(options.state=='default')
-          @name=user_info.name
-          @email=user_info.email
-        else
+        if(options.state.downcase=='wfuat')
           @name=user_info.cscn
           @email=user_info.csuserprincipalname
+        else
+          @name=user_info.name
+          @email=user_info.email
         end
         env['omniauth.auth'] = AuthHash.new(
             provider: name,

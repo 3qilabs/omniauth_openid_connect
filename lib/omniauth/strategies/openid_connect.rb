@@ -67,7 +67,7 @@ module OmniAuth
 
       info do
         puts "In customized org:#{options.state}"
-        if(options.state.downcase =='wfuat')
+        if(options.state.downcase =='wf')
           puts "customized org name:#{options.state}"
           {
               name: user_info.cscn,
@@ -641,7 +641,7 @@ module OmniAuth
         #puts "id_token_callback_phase"
         # user_data = decode_id_token(params['id_token']).raw_attributes
         #puts "user_data['name']:#{user_info.name}"
-        if(options.state.downcase=='wfuat')
+        if(options.state.downcase=='wf')
           @name=user_info.cscn
           @email=user_info.csuserprincipalname
         else

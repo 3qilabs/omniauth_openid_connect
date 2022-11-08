@@ -129,26 +129,26 @@ module OmniAuth
       end
 
       def callback_phase
-        #puts "In callback_phase"
+        puts "In callback_phase"
         error = params['error_reason'] || params['error']
         error_description = params['error_description'] || params['error_reason']
         invalid_state = params['state'].to_s.empty? || params['state'] != stored_state
-        #puts "invalid_state:#{invalid_state}"
+        puts "invalid_state:#{invalid_state}"
         raise CallbackError, error: params['error'], reason: error_description, uri: params['error_uri'] if error
         raise CallbackError, error: :csrf_detected, reason: "Invalid 'state' parameter" if invalid_state
-        #puts "valid_response_type?:#{valid_response_type?}"
+        puts "valid_response_type?:#{valid_response_type?}"
         return unless valid_response_type?
 
         options.issuer = issuer if options.issuer.nil? || options.issuer.empty?
-        #puts "options.issuer:#{options.issuer}"
+        puts "options.issuer:#{options.issuer}"
         verify_id_token!(params['id_token']) if configured_response_type == 'id_token'
         discover!
         client.redirect_uri = redirect_uri
 
         return id_token_callback_phase if configured_response_type == 'id_token'
-        #puts "authorization_code:#{authorization_code}"
+        puts "authorization_code:#{authorization_code}"
         client.authorization_code = authorization_code
-        #puts "access_token:#{access_token}"
+        puts "access_token:#{access_token}"
         access_token
         super
       rescue CallbackError => e

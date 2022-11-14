@@ -59,44 +59,25 @@ module OmniAuth
       option :uid_field, 'sub'
 
       def uid
-        #puts "in uid"
         user_info.raw_attributes[options.uid_field.to_sym] || user_info.sub
-        #options.uid_field.to_sym || user_info.sub
       end
 
 
       info do
-        puts "In customized org:#{options.state}"
-        if(options.state.downcase =='wf')
-          puts "customized org name:#{options.state}"
-          {
-              name: user_info.cscn,
-              email: user_info.csuserprincipalname,
-              nickname: user_info.cssamaccountname,
-              first_name: user_info.csgivenname,
-              last_name: user_info.cssn,
-              phone: user_info.cstelephonenumber,
-              provider: options.name,
-              uid: user_info.sub,
-
-          }
-        else
-          puts "default org name:#{options.state}"
-          {
-              name: user_info.name,
-              email: user_info.email,
-              nickname: user_info.preferred_username,
-              first_name: user_info.given_name,
-              last_name: user_info.family_name,
-              gender: user_info.gender,
-              image: user_info.picture,
-              phone: user_info.phone_number,
-              provider: options.name,
-              uid: user_info.sub,
-              urls: { website: user_info.website },
-
-          }
-        end
+        puts "Info()"
+        {
+            name: user_info.name,
+            email: user_info.email,
+            nickname: user_info.preferred_username,
+            first_name: user_info.given_name,
+            last_name: user_info.family_name,
+            gender: user_info.gender,
+            image: user_info.picture,
+            phone: user_info.phone_number,
+            provider: options.name,
+            uid: user_info.sub,
+            urls: { website: user_info.website },
+        }
       end
 
       extra do
@@ -113,7 +94,6 @@ module OmniAuth
         }
       end
 
-
       def client
         @client ||= ::OpenIDConnect::Client.new(client_options)
       end
@@ -129,28 +109,23 @@ module OmniAuth
       end
 
       def callback_phase
-        puts "In callback_phase"
+        puts "callback_phase()"
         error = params['error_reason'] || params['error']
         error_description = params['error_description'] || params['error_reason']
         invalid_state = params['state'].to_s.empty? || params['state'] != stored_state
-        puts "invalid_state:#{invalid_state}"
         raise CallbackError, error: params['error'], reason: error_description, uri: params['error_uri'] if error
         raise CallbackError, error: :csrf_detected, reason: "Invalid 'state' parameter" if invalid_state
-        puts "valid_response_type?:#{valid_response_type?}"
         return unless valid_response_type?
 
         options.issuer = issuer if options.issuer.nil? || options.issuer.empty?
-        puts "options.issuer:#{options.issuer}"
         verify_id_token!(params['id_token']) if configured_response_type == 'id_token'
         discover!
         client.redirect_uri = redirect_uri
 
         return id_token_callback_phase if configured_response_type == 'id_token'
-        puts "authorization_code:#{authorization_code}"
         client.authorization_code = authorization_code
-        puts "access_token:#{access_token}"
         access_token
-        super
+        id_token_callback_phase
       rescue CallbackError => e
         fail!(e.error, e)
       rescue ::Rack::OAuth2::Client::Error => e
@@ -164,7 +139,6 @@ module OmniAuth
 
 
       def other_phase
-        # puts "In other_phase"
         if logout_path_pattern.match?(current_path)
           options.issuer = issuer if options.issuer.to_s.empty?
           discover!
@@ -186,7 +160,7 @@ module OmniAuth
       end
 
       def authorize_uri
-        #puts "In authorize_uri"
+        puts "authorize_uri()"
         client.redirect_uri = redirect_uri
         opts = {
             response_type: options.response_type,
@@ -223,7 +197,6 @@ module OmniAuth
 
       def discover!
         return unless options.discovery
-        #puts "config:#{config.to_s}"
         client_options.authorization_endpoint = config.authorization_endpoint
         client_options.token_endpoint = config.token_endpoint
         client_options.userinfo_endpoint = config.userinfo_endpoint
@@ -232,80 +205,64 @@ module OmniAuth
       end
 
       def user_info
+        puts "user_info()"
         return @user_info if @user_info
         token_hash = JSON.parse(access_token).with_indifferent_access
         id_token=token_hash[:id_token]
         access_token=token_hash[:access_token]
-        # if access_token.id_token
-        #   decoded = decode_id_token(access_token.id_token).raw_attributes
-        #
-        #   @user_info = ::OpenIDConnect::ResponseObject::UserInfo.new access_token.userinfo!.raw_attributes.merge(decoded)
-        # else
-        #   @user_info = access_token.userinfo!
-        # end
         verify_status=verify_token!(id_token,'id_token')
         if(verify_status[:active])
           user=get_user_info(access_token)
-          #puts "user:#{user}"
-          @user_info = ::OpenIDConnect::ResponseObject::UserInfo.new user.merge(verify_status)
+          if(options.state.downcase =='wf')
+            @user_info =::OpenIDConnect::ResponseObject::UserInfo.new({
+                                                                          "iss": verify_status[:iss],
+                                                                          "sub": verify_status[:sub],
+                                                                          "aud": verify_status[:aud],
+                                                                          "iat": verify_status[:iat],
+                                                                          "exp": verify_status[:exp],
+                                                                          "acr": verify_status[:acr],
+                                                                          "amr": ["mfa","mca","user"],
+                                                                          "auth_time": verify_status[:auth_time],
+                                                                          "at_hash": verify_status[:jti],
+                                                                          "nonce": verify_status[:nonce],
+                                                                          "sid": verify_status[:jti],
+                                                                          "email": user[:csuserprincipalname],
+                                                                          "preferred_username": user[:cscn],
+                                                                          "given_name": user[:csgivenname],
+                                                                          "middle_name":user[:cssamaccountname],
+                                                                          "name": user[:cscn],
+                                                                          "updated_at": verify_status[:auth_time],
+                                                                          "family_name": user[:cssn],
+                                                                          "nickname": user[:csgivenname],
+                                                                          "FirstName": user[:csgivenname],
+                                                                          "LastName": user[:cssn],
+                                                                          "EmailAddress": user[:csuserprincipalname]
+                                                                      })
+          else
+            @user_info = ::OpenIDConnect::ResponseObject::UserInfo.new user.merge(verify_status)
+          end
         else
           raise InvalidToken.new('Invalid ID token')
         end
-        # @user_info =::OpenIDConnect::ResponseObject::UserInfo.new({
-        #     "iss": "https://auth.pingone.asia/2b8c6599-7834-4d4b-9cf6-96c3c8ebb106/as",
-        #     "sub": "b34c8bd1-f9df-4804-a3c5-91ba6f592bac",
-        #     "aud": "a3bfb78c-a841-4e4c-a2aa-d66071b28500",
-        #     "iat": 1662869285,
-        #     "exp": 1662872885,
-        #     "acr": "Multi_Factor",
-        #     "amr": [
-        #         "mfa",
-        #         "mca",
-        #         "user"
-        #     ],
-        #     "auth_time": 1662869282,
-        #     "at_hash": "5DtR1S9iPFgdOtBGIm_ZMg",
-        #     "nonce": "29321497f38d29a961676ecc0fecb386",
-        #     "sid": "83bab3e2-0238-4c28-8e10-0a441ac88d1f",
-        #     "email": "sayalihole.hole1@gmail.com",
-        #     "preferred_username": "sayali_2002",
-        #     "given_name": "sayali",
-        #     "middle_name": "vinayak",
-        #     "name": "sayali hole",
-        #     "updated_at": 1662869282,
-        #     "family_name": "hole",
-        #     "nickname": "sayali",
-        #     "FirstName": "sayali",
-        #     "LastName": "hole",
-        #     "EmailAddress": "sayalihole.hole1@gmail.com",
-        #     "env": "2b8c6599-7834-4d4b-9cf6-96c3c8ebb106",
-        #     "org": "fe9b380a-aca2-4429-9053-46977ec84420",
-        #     "p1.region": "AP"
-        # })
       end
 
       def access_token
-        #puts "In access token"
+        puts "access_token()"
         return @access_token if @access_token
 
         @access_token = access_token_check(
             scope: (options.scope if options.send_scope_to_token_endpoint),
             client_auth_method: options.client_auth_method
         )
-        #puts "access token1:#{@access_token}"
-        #Rack ::OAuth2::AccessToken.new(data)
-        #verify_id_token!(@access_token.id_token) if configured_response_type == 'code'
-        #puts "access token2:#{@access_token}"
-        #@access_token
         @access_token
       end
 
       def access_token_check(*args)
+        puts "access_token_check()"
         headers,params, http_client, options = authenticated_context_from(*args)
         headers1= {}
         headers1.merge!(
-            'Content-Type' => "application/x-www-form-urlencoded",
-            'Host'=> client_options.host
+            'Content-Type' => "application/x-www-form-urlencoded"
         )
         params[:scope] = Array(options.delete(:scope)).join(' ') if options[:scope].present?
         params[:client_id]=client_options.identifier
@@ -313,85 +270,65 @@ module OmniAuth
         params[:code]=authorization_code
         params[:grant_type]="authorization_code"
         params[:redirect_uri]=client_options.redirect_uri
-        #@grant = Grant::ClientCredentials.new
-        #puts "grant:#{@grant.as_json}"
-        #params.merge! @grant.as_json
         params.merge! options
-        #puts "params:#{::Rack::OAuth2::Util.compact_hash(params)}"
         c=::Rack::OAuth2::Util.compact_hash(params)
-        #puts "code:#{c[:code]}"
-        #puts "RootCA:#{Rails.root}"
         uri = URI.parse(client_options.token_endpoint)
-        uri.query = URI.encode_www_form( ::Rack::OAuth2::Util.compact_hash(params) )
+        post_data = URI.encode_www_form( ::Rack::OAuth2::Util.compact_hash(params) )
         http = Net::HTTP.new(uri.host, uri.port)
         http.use_ssl = true
         http.verify_mode = OpenSSL::SSL::VERIFY_NONE
-
         request = Net::HTTP::Post.new(uri, headers1)
-        #puts "uri:#{uri}"
-        #puts "headers:#{headers1}"
-        response = http.request(request)
-
-        #puts response.body
-        #puts response.code
+        response = http.request(request,post_data)
         handle_response(response)
         return response.body
       end
 
       def verify_token!(id_token,token_type)
+        puts "verify_token!()"
         return unless id_token
         token_verfiy_endpoint=client_options.verify_uri
         params= {}
         headers1= {}
         headers1.merge!(
-            'Content-Type' => "application/x-www-form-urlencoded",
-            'Host'=> client_options.host
+            'Content-Type' => "application/x-www-form-urlencoded"
         )
         params[:token] = id_token
         params[:token_type_hint]=token_type
         params[:client_id]=client_options.identifier
         params[:client_secret]=client_options.secret
-        #puts "params:#{::Rack::OAuth2::Util.compact_hash(params)}"
         c=::Rack::OAuth2::Util.compact_hash(params)
-        #puts "code:#{c[:code]}"
-
-        #puts "RootCA:#{Rails.root}"
         uri = URI.parse(token_verfiy_endpoint)
         http = Net::HTTP.new(uri.host, uri.port)
         http.use_ssl = true
         http.verify_mode = OpenSSL::SSL::VERIFY_NONE
 
         request = Net::HTTP::Post.new(uri, headers1)
-        #puts "uri:#{uri}"
-        #puts "headers:#{headers1}"
-        #puts "body:#{request.body}"
         post_data = URI.encode_www_form(params)
         response = http.request(request,post_data)
         return handle_user_response(response)
       end
 
       def get_user_info(token)
+        puts "get_user_info()"
         return unless token
         token_verfiy_endpoint=client_options.userinfo_endpoint
         params= {}
         headers1= {}
         headers1.merge!(
             'Content-Type' => "application/x-www-form-urlencoded",
-            'Host'=> client_options.host,
             'Authorization'=> "Bearer "+token
         )
         uri = URI.parse(token_verfiy_endpoint)
         http = Net::HTTP.new(uri.host, uri.port)
         http.use_ssl = true
         http.verify_mode = OpenSSL::SSL::VERIFY_NONE
-
         request = Net::HTTP::Post.new(uri, headers1)
-        #puts "uri:#{uri}"
-        #puts "headers:#{headers1}"
         response = http.request(request)
+        puts "response:#{response.body}"
         get_info
         return handle_user_response(response)
       end
+
       def get_info
         token_hash = JSON.parse(access_token).with_indifferent_access
         @id_token= token_hash[:id_token]
@@ -479,14 +416,10 @@ module OmniAuth
       end
 
       def handle_response(response)
-        #response = yield
-        puts "status:#{response.code.to_i}"
         case response.code.to_i
         when 200
-          puts "in success 200"
           handle_success_response(response)
         else
-          puts "in error"
           handle_error_response(response)
         end
       end
@@ -502,9 +435,7 @@ module OmniAuth
       end
 
       def handle_success_response(response)
-        #puts "In handle_success_response"
         token_hash = JSON.parse(response.body).with_indifferent_access
-        #puts "In handle_success_response:#{token_hash[:token_type]}"
         case (@forced_token_type || token_hash[:token_type]).try(:downcase)
         when 'bearer'
           ::Rack::OAuth2::AccessToken::Bearer.new(token_hash)
@@ -536,14 +467,6 @@ module OmniAuth
       end
 
       def new_state
-        # state = if options.state.respond_to?(:call)
-        #           if options.state.arity == 1
-        #             options.state.call(env)
-        #           else
-        #             options.state.call
-        #           end
-        #         end
-        #puts "state:#{options.state}"
         state=options.state
         session['omniauth.state'] = state || SecureRandom.hex(16)
       end
@@ -567,12 +490,10 @@ module OmniAuth
       end
 
       def key_or_secret
-        #puts "key_or_secret:#{options.client_signing_alg}"
         case options.client_signing_alg
         when :HS256, :HS384, :HS512
           client_options.secret
         when :RS256, :RS384, :RS512
-          puts "client_jwk_signing_key:#{options.client_jwk_signing_key}"
           if options.client_jwk_signing_key
             parse_jwk_key(res)
           elsif options.client_x509_signing_key
@@ -612,23 +533,18 @@ module OmniAuth
       end
 
       def redirect_uri
-        #puts "redirect_uri"
         return client_options.redirect_uri unless params['redirect_uri']
-
         "#{ client_options.redirect_uri }?redirect_uri=#{ CGI.escape(params['redirect_uri']) }"
       end
 
       def encoded_post_logout_redirect_uri
-        #puts "encoded_post_logout_redirect_uri"
         return unless options.post_logout_redirect_uri
-
         URI.encode_www_form(
             post_logout_redirect_uri: options.post_logout_redirect_uri
         )
       end
 
       def end_session_endpoint_is_valid?
-        #puts "end_session_endpoint_is_valid?"
         client_options.end_session_endpoint &&
             client_options.end_session_endpoint =~ URI::DEFAULT_PARSER.make_regexp
       end
@@ -638,23 +554,13 @@ module OmniAuth
       end
 
       def id_token_callback_phase
-        #puts "id_token_callback_phase"
-        # user_data = decode_id_token(params['id_token']).raw_attributes
-        #puts "user_data['name']:#{user_info.name}"
-        if(options.state.downcase=='wf')
-          @name=user_info.cscn
-          @email=user_info.csuserprincipalname
-        else
-          @name=user_info.name
-          @email=user_info.email
-        end
-        env['omniauth.auth'] = AuthHash.new(
-            provider: name,
-            uid: user_info.sub,
-            info: { name: @name, email: @email },
-            extra: { raw_info: user_info }
-        )
-        #puts " env['omniauth.auth']:#{ env['omniauth.auth']}"
+        puts "id_token_callback_phase()"
+          env['omniauth.auth'] = AuthHash.new(
+              provider: options.name,
+              uid: user_info.sub,
+              info: { name: user_info.name, email: user_info.email, nickname: user_info.preferred_username, first_name: user_info.given_name, last_name: user_info.family_name, provider: options.name, uid: user_info.sub  },
+              extra: { raw_info: user_info }
+          )
         call_app!
       end
 
